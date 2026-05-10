@@ -25,7 +25,9 @@
   2. User can enter an OpenAI API key once and have it used for the call (in-memory or simple config is acceptable for this slice).
   3. User receives a .docx file on disk that contains the GPT summary text.
   4. The generated .docx opens cleanly in Microsoft Word without corruption warnings.
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 01-01-PLAN.md — Single-file Tkinter app: paste Korean meeting text → gpt-4o-mini → .docx (scaffold + summarize_text + write_docx + GUI wire-up + manual smoke checkpoint)
 
 ### Phase 2: File Input + Desktop GUI Shell
 **Goal:** A user runs a real Windows desktop app, picks or drops a .txt/.md/.docx meeting file, and gets a summary .docx — no copy-paste required.
