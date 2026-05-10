@@ -1,39 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 type Status =
   | { kind: "idle" }
-  | { kind: "loading" }
+  | { kind: "extracting"; filename: string }
+  | { kind: "summarizing" }
+  | { kind: "saving" }
   | { kind: "error"; message: string }
-  | { kind: "done" };
+  | { kind: "done"; meetingId: string | null };
+
+const ACCEPT = ".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export default function Home() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [apiKey, setApiKey] = useState("");
   const [meeting, setMeeting] = useState("");
+  const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+
+  async function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setStatus({ kind: "extracting", filename: file.name });
+    try {
+      const text = await extractText(file);
+      setMeeting(text);
+      if (!title.trim()) setTitle(file.name.replace(/\.(txt|md|docx)$/i, ""));
+      setStatus({ kind: "idle" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: `파일 읽기 실패: ${msg}` });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   async function onSummarize() {
     if (!apiKey.trim() || !meeting.trim()) {
       setStatus({
         kind: "error",
-        message: "API 키와 회의록을 모두 입력해주세요.",
+        message: "API 키와 회의록 내용을 모두 입력해주세요.",
       });
       return;
     }
 
     setSummary("");
-    setStatus({ kind: "loading" });
+    setStatus({ kind: "summarizing" });
 
     try {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKey.trim(), meeting }),
+        body: JSON.stringify({
+          apiKey: apiKey.trim(),
+          meeting,
+          title: title.trim() || null,
+        }),
       });
 
-      const data = (await res.json()) as { summary?: string; error?: string };
+      const data = (await res.json()) as {
+        summary?: string;
+        meetingId?: string;
+        saved?: boolean;
+        saveError?: string;
+        error?: string;
+      };
 
       if (!res.ok) {
         setStatus({
@@ -44,21 +82,65 @@ export default function Home() {
       }
 
       setSummary(data.summary ?? "");
-      setStatus({ kind: "done" });
+      setStatus({ kind: "done", meetingId: data.meetingId ?? null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatus({ kind: "error", message: `네트워크 오류: ${msg}` });
     }
   }
 
-  const busy = status.kind === "loading";
+  async function onSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
+
+  const busy =
+    status.kind === "extracting" ||
+    status.kind === "summarizing" ||
+    status.kind === "saving";
 
   return (
     <main>
-      <h1>회의록 요약기</h1>
-      <p className="subtitle">
-        회의록을 붙여넣고 요약 버튼을 누르세요. OpenAI gpt-4o-mini로 한국어 요약을 생성합니다.
-      </p>
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 16,
+        }}
+      >
+        <div>
+          <h1>회의록 요약기</h1>
+          <p className="subtitle">
+            회의록을 붙여넣거나 파일을 업로드해 한국어로 요약합니다.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <Link
+            href="/history"
+            style={{ color: "#0071e3", textDecoration: "none", fontSize: 14 }}
+          >
+            기록 보기 →
+          </Link>
+          <button
+            type="button"
+            onClick={onSignOut}
+            style={{
+              background: "none",
+              border: "1px solid #d2d2d7",
+              color: "#1d1d1f",
+              padding: "6px 12px",
+              borderRadius: 6,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            로그아웃
+          </button>
+        </div>
+      </header>
 
       <div className="field">
         <label className="label" htmlFor="apiKey">
@@ -80,13 +162,62 @@ export default function Home() {
       </div>
 
       <div className="field">
-        <label className="label" htmlFor="meeting">
-          회의록
+        <label className="label" htmlFor="title">
+          제목 (선택)
         </label>
+        <input
+          id="title"
+          className="input"
+          type="text"
+          placeholder="예: 주간 기획 회의 (10/14)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={busy}
+        />
+      </div>
+
+      <div className="field">
+        <label className="label">회의록</label>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginBottom: 8,
+            alignItems: "center",
+          }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPT}
+            onChange={onFileSelect}
+            disabled={busy}
+            style={{ display: "none" }}
+            id="fileInput"
+          />
+          <label
+            htmlFor="fileInput"
+            style={{
+              display: "inline-block",
+              padding: "8px 14px",
+              border: "1px solid #d2d2d7",
+              borderRadius: 6,
+              fontSize: 13,
+              cursor: busy ? "not-allowed" : "pointer",
+              background: "#fff",
+              color: "#1d1d1f",
+              opacity: busy ? 0.5 : 1,
+            }}
+          >
+            파일 업로드 (.txt / .md / .docx)
+          </label>
+          <span className="muted" style={{ marginTop: 0 }}>
+            업로드 시 아래 텍스트박스에 자동 채워집니다
+          </span>
+        </div>
         <textarea
-          id="meeting"
           className="textarea"
-          placeholder="회의 내용을 여기에 붙여넣으세요."
+          placeholder="회의 내용을 여기에 붙여넣거나 위에서 파일을 업로드하세요."
           value={meeting}
           onChange={(e) => setMeeting(e.target.value)}
           disabled={busy}
@@ -94,14 +225,36 @@ export default function Home() {
       </div>
 
       <button className="button" onClick={onSummarize} disabled={busy}>
-        {busy ? "요약 중..." : "요약"}
+        {status.kind === "summarizing"
+          ? "요약 중..."
+          : status.kind === "saving"
+            ? "저장 중..."
+            : "요약"}
       </button>
 
-      {status.kind === "loading" && (
-        <div className="status info">GPT 호출 중입니다. 보통 5~30초 걸립니다…</div>
+      {status.kind === "extracting" && (
+        <div className="status info">
+          파일 읽는 중: {status.filename}
+        </div>
+      )}
+      {status.kind === "summarizing" && (
+        <div className="status info">
+          GPT 호출 중입니다. 보통 5~30초 걸립니다…
+        </div>
       )}
       {status.kind === "error" && (
         <div className="status error">에러: {status.message}</div>
+      )}
+      {status.kind === "done" && status.meetingId && (
+        <div className="status info">
+          저장됨.{" "}
+          <Link
+            href={`/meeting/${status.meetingId}`}
+            style={{ color: "#0040a3", textDecoration: "underline" }}
+          >
+            상세 보기
+          </Link>
+        </div>
       )}
 
       {summary && (
@@ -112,4 +265,20 @@ export default function Home() {
       )}
     </main>
   );
+}
+
+async function extractText(file: File): Promise<string> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".txt") || name.endsWith(".md")) {
+    return await file.text();
+  }
+  if (name.endsWith(".docx")) {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/extract", { method: "POST", body: form });
+    const data = (await res.json()) as { text?: string; error?: string };
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+    return data.text ?? "";
+  }
+  throw new Error("지원하지 않는 파일 형식입니다 (.txt / .md / .docx만 가능)");
 }

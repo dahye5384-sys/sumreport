@@ -1,47 +1,82 @@
 # sumreport — 회의록 요약기 (Web)
 
-회의록을 붙여넣으면 OpenAI GPT (`gpt-4o-mini`) 가 한국어로 요약해주는 Next.js 웹 앱.
+회의록(텍스트 / .txt / .md / .docx)을 입력하면 OpenAI GPT (`gpt-4o-mini`)가
+한국어로 요약해주는 Next.js 웹 앱. **Supabase로 사용자 계정 + 요약 기록 저장**.
 Vercel에서 호스팅합니다.
 
-## Phase 1 (현재 — 첫 Vercel 배포)
+## 기능 (현재)
 
-- 페이지에 회의록 텍스트 붙여넣기
-- OpenAI API 키 입력 (브라우저에서, 서버 미저장)
-- "요약" 버튼 → `/api/summarize` → GPT 호출 → 페이지에 한국어 요약 표시
-- 평문 출력만 (.docx 다운로드는 Phase 2에서 추가)
-- 로그인 없음 (Phase 4에서 비밀번호 게이트 추가)
+- 이메일/비밀번호 회원가입·로그인 (Supabase Auth)
+- 회의록 입력:
+  - 텍스트 직접 붙여넣기
+  - **파일 업로드** — `.txt`, `.md`, `.docx` (Word는 서버에서 mammoth로 본문 추출)
+- OpenAI API 키는 사용자가 페이지에서 직접 입력 (서버 미저장)
+- 요약 성공 시 **자동으로 Supabase에 저장** (원본 + 요약)
+- `/history` 페이지에서 본인 회의록 목록 확인
+- `/meeting/[id]` 페이지에서 상세 보기 (요약 + 원본)
+- Row Level Security로 사용자 간 데이터 분리
 
-이후 phase는 `.planning/ROADMAP.md` 참고.
+이후 phase는 `.planning/ROADMAP.md` 참고. 다음 예정: 4섹션 구조화 + .docx 다운로드.
+
+---
+
+## 셋업 가이드
+
+### 1. Supabase 프로젝트 만들기
+
+1. https://supabase.com → "New project" → 이름·비밀번호 설정
+2. 프로젝트 생성되면 좌측 메뉴 **SQL Editor** → **New query**
+3. 이 저장소의 [`supabase/schema.sql`](supabase/schema.sql) 내용을 **전체 복사·붙여넣고 Run**
+4. **Authentication → Providers → Email**에서:
+   - 개인 사용/테스트라면 **"Confirm email" 체크 해제** (메일 링크 클릭 없이 바로 로그인 가능)
+   - 공개 배포라면 그대로 두고 SMTP 설정 추가
+5. **Project Settings → API**에서 두 값을 메모:
+   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+   - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### 2. Vercel 환경변수 등록
+
+Vercel Dashboard → 프로젝트 → **Settings → Environment Variables**에 두 개 추가:
+
+| Name | Value |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | (Supabase에서 복사한 Project URL) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (Supabase에서 복사한 anon public key) |
+
+저장 후 **Deployments → 최신 배포 → Redeploy** 클릭 (환경변수는 새로 빌드해야 적용됨).
+
+### 3. 첫 로그인
+
+배포된 URL 접속 → 로그인 페이지로 리다이렉트 → "회원가입" → 이메일/비밀번호로 가입 → 메인 페이지.
+
+---
 
 ## 로컬 개발
 
 ```bash
+cp .env.example .env.local   # 두 개 값 채우기
 npm install
 npm run dev
 ```
 
-브라우저에서 http://localhost:3000 접속.
+http://localhost:3000 접속.
 
-API 키는 페이지 입력칸에 직접 붙여넣습니다 (서버 환경변수 X).
-
-## Vercel 배포
-
-1. Vercel에서 GitHub `dahye5384-sys/sumreport` 임포트
-2. Framework Preset: **Next.js** (자동 감지)
-3. Build/Output 설정 변경 없음 (기본값 사용)
-4. Deploy 클릭
-5. 이후 `main` 브랜치에 push될 때마다 자동 배포
-
-배포되면 `https://<프로젝트이름>.vercel.app` 에서 접속 가능.
+---
 
 ## 보안 / 데이터 정책
 
-- **API 키**: 브라우저 → 서버 1회 전송 → 요청 처리 후 메모리에서 폐기. 디스크/로그/DB 어디에도 저장 안 함.
-- **회의록 내용**: OpenAI API로 전송됩니다 (요약을 위해). 서버 자체에는 저장 안 함.
-- 민감 정보가 포함된 회의록은 회사 정책상 외부 API 사용 가능 여부 확인 후 사용하세요.
+- **OpenAI API 키**: 브라우저 → 서버 1회 전송 → 요청 처리 후 메모리에서 폐기.
+  디스크/로그/DB 어디에도 저장 안 함.
+- **회의록 본문**: OpenAI API로 전송됩니다 (요약 목적). Supabase DB에는 본인 계정으로만 저장됨.
+- **Row Level Security (RLS)**: Supabase 정책으로 본인 행만 읽기/쓰기 가능. 다른 사용자는 절대 못 봄.
+- 민감 정보가 포함된 회의록은 회사 정책상 외부 API/DB 사용 가능 여부 확인 후 사용하세요.
+
+---
 
 ## Tech Stack
 
 - Next.js 14 (App Router) + TypeScript + React 18
-- OpenAI Node SDK (v4)
+- Supabase (Postgres + Auth) via `@supabase/ssr`
+- OpenAI Node SDK (v4) — `gpt-4o-mini`
+- Word 파싱: `mammoth`
 - Vercel Serverless Functions (`maxDuration: 60s`)

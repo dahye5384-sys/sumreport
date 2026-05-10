@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,6 +16,7 @@ const SYSTEM_PROMPT = `당신은 한국어 회의록 요약 전문가입니다.
 interface SummarizeRequest {
   apiKey?: string;
   meeting?: string;
+  title?: string | null;
 }
 
 export async function POST(req: Request) {
@@ -30,6 +32,7 @@ export async function POST(req: Request) {
 
   const apiKey = body.apiKey?.trim();
   const meeting = body.meeting?.trim();
+  const title = body.title?.trim() || null;
 
   if (!apiKey) {
     return NextResponse.json(
@@ -44,9 +47,22 @@ export async function POST(req: Request) {
     );
   }
 
-  // Per-request client. Key lives only in this scope, never persisted.
+  // Auth check — only logged-in users may summarize+save.
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 },
+    );
+  }
+
+  // Per-request OpenAI client — key is never persisted.
   const client = new OpenAI({ apiKey, timeout: 55_000 });
 
+  let summary = "";
   try {
     const completion = await client.chat.completions.create({
       model: MODEL,
@@ -56,20 +72,48 @@ export async function POST(req: Request) {
       ],
       temperature: 0.3,
     });
-
-    const summary = completion.choices[0]?.message?.content?.trim() ?? "";
+    summary = completion.choices[0]?.message?.content?.trim() ?? "";
     if (!summary) {
       return NextResponse.json(
         { error: "GPT 응답이 비어있습니다. 회의록을 다시 확인해주세요." },
         { status: 502 },
       );
     }
-
-    return NextResponse.json({ summary });
   } catch (err: unknown) {
-    const message = formatOpenAIError(err);
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json(
+      { error: formatOpenAIError(err) },
+      { status: 502 },
+    );
   }
+
+  // Auto-save to Supabase. Failure to save is reported but the summary
+  // still returns so the user does not lose work.
+  let meetingId: string | null = null;
+  let saveError: string | null = null;
+  try {
+    const { data, error } = await supabase
+      .from("meetings")
+      .insert({
+        user_id: user.id,
+        title,
+        original_text: meeting,
+        summary,
+        model: MODEL,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    meetingId = data.id as string;
+  } catch (err: unknown) {
+    saveError = err instanceof Error ? err.message : String(err);
+  }
+
+  return NextResponse.json({
+    summary,
+    meetingId,
+    saved: meetingId !== null,
+    saveError,
+  });
 }
 
 function formatOpenAIError(err: unknown): string {
