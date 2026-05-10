@@ -71,17 +71,36 @@
 
 ## Traceability
 
-Empty initially. Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmapper) | | Pending |
+| INPUT-01 | Phase 2 | Pending |
+| INPUT-02 | Phase 2 | Pending |
+| INPUT-03 | Phase 4 | Pending |
+| INPUT-04 | Phase 1 | Pending |
+| INPUT-05 | Phase 5 | Pending |
+| AI-01    | Phase 1 | Pending |
+| AI-02    | Phase 5 | Pending |
+| AI-03    | Phase 1 | Pending |
+| AI-04    | Phase 3 | Pending |
+| AI-05    | Phase 5 | Pending |
+| REPORT-01 | Phase 1 | Pending |
+| REPORT-02 | Phase 3 | Pending |
+| REPORT-03 | Phase 3 | Pending |
+| REPORT-04 | Phase 3 | Pending |
+| REPORT-05 | Phase 3 | Pending |
+| REPORT-06 | Phase 5 | Pending |
+| REPORT-07 | Phase 1 | Pending |
+| UI-01    | Phase 2 | Pending |
+| UI-02    | Phase 2 | Pending |
+| UI-03    | Phase 5 | Pending |
+| UI-04    | Phase 5 | Pending |
+| UI-05    | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
-- Mapped to phases: 0 (pending)
-- Unmapped: 22 ⚠️
+- Mapped to phases: 22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-10*
-*Last updated: 2026-05-10 after initial definition*
+*Last updated: 2026-05-10 — traceability populated by roadmapper*
