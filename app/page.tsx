@@ -114,7 +114,7 @@ export default function Home() {
         <div>
           <h1>회의록 요약기</h1>
           <p className="subtitle">
-            회의록을 붙여넣거나 파일을 업로드해 한국어로 요약합니다.
+            회의록을 붙여넣거나 파일을 업로드해 Google Gemini로 한국어 요약합니다.
           </p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -144,20 +144,29 @@ export default function Home() {
 
       <div className="field">
         <label className="label" htmlFor="apiKey">
-          OpenAI API 키
+          Gemini API 키
         </label>
         <input
           id="apiKey"
           className="input"
           type="password"
           autoComplete="off"
-          placeholder="sk-..."
+          placeholder="AIza..."
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           disabled={busy}
         />
         <p className="muted">
-          서버에 저장되지 않으며 요청 1회 사용 후 폐기됩니다. 새로고침 시 사라집니다.
+          무료 키 발급:{" "}
+          <a
+            href="https://aistudio.google.com/app/apikey"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: "#0071e3" }}
+          >
+            aistudio.google.com/app/apikey
+          </a>{" "}
+          · 서버에 저장되지 않으며 요청 1회 사용 후 폐기됩니다.
         </p>
       </div>
 
@@ -239,7 +248,7 @@ export default function Home() {
       )}
       {status.kind === "summarizing" && (
         <div className="status info">
-          GPT 호출 중입니다. 보통 5~30초 걸립니다…
+          Gemini 호출 중입니다. 보통 3~15초 걸립니다…
         </div>
       )}
       {status.kind === "error" && (

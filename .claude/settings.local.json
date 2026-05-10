@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p .planning/archive)",
+      "Bash(git mv *)",
+      "Bash(git rm *)",
+      "Bash(rm -rf __pycache__ output .claude)",
+      "Bash(git commit -m 'chore: archive v1.0 desktop work; pivot to web \\(Next.js + Vercel\\) *)",
+      "Bash(gsd-sdk query *)",
+      "Bash(git push *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat\\(01\\): minimal Next.js app — paste meeting → GPT summary *)"
+    ]
+  }
+}

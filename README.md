@@ -1,8 +1,11 @@
 # sumreport — 회의록 요약기 (Web)
 
-회의록(텍스트 / .txt / .md / .docx)을 입력하면 OpenAI GPT (`gpt-4o-mini`)가
+회의록(텍스트 / .txt / .md / .docx)을 입력하면 **Google Gemini** (`gemini-2.0-flash`)가
 한국어로 요약해주는 Next.js 웹 앱. **Supabase로 사용자 계정 + 요약 기록 저장**.
 Vercel에서 호스팅합니다.
+
+> Gemini API는 **카드 등록 없이 무료 한도** 안에서 사용 가능 (분당 15회, 일일 1500회 정도).
+> 키 발급: https://aistudio.google.com/app/apikey
 
 ## 기능 (현재)
 
@@ -10,7 +13,7 @@ Vercel에서 호스팅합니다.
 - 회의록 입력:
   - 텍스트 직접 붙여넣기
   - **파일 업로드** — `.txt`, `.md`, `.docx` (Word는 서버에서 mammoth로 본문 추출)
-- OpenAI API 키는 사용자가 페이지에서 직접 입력 (서버 미저장)
+- Gemini API 키는 사용자가 페이지에서 직접 입력 (서버 미저장)
 - 요약 성공 시 **자동으로 Supabase에 저장** (원본 + 요약)
 - `/history` 페이지에서 본인 회의록 목록 확인
 - `/meeting/[id]` 페이지에서 상세 보기 (요약 + 원본)
@@ -65,9 +68,9 @@ http://localhost:3000 접속.
 
 ## 보안 / 데이터 정책
 
-- **OpenAI API 키**: 브라우저 → 서버 1회 전송 → 요청 처리 후 메모리에서 폐기.
+- **Gemini API 키**: 브라우저 → 서버 1회 전송 → 요청 처리 후 메모리에서 폐기.
   디스크/로그/DB 어디에도 저장 안 함.
-- **회의록 본문**: OpenAI API로 전송됩니다 (요약 목적). Supabase DB에는 본인 계정으로만 저장됨.
+- **회의록 본문**: Google Gemini API로 전송됩니다 (요약 목적). Supabase DB에는 본인 계정으로만 저장됨.
 - **Row Level Security (RLS)**: Supabase 정책으로 본인 행만 읽기/쓰기 가능. 다른 사용자는 절대 못 봄.
 - 민감 정보가 포함된 회의록은 회사 정책상 외부 API/DB 사용 가능 여부 확인 후 사용하세요.
 
@@ -77,6 +80,6 @@ http://localhost:3000 접속.
 
 - Next.js 14 (App Router) + TypeScript + React 18
 - Supabase (Postgres + Auth) via `@supabase/ssr`
-- OpenAI Node SDK (v4) — `gpt-4o-mini`
+- Google Gemini API via `@google/generative-ai` — `gemini-2.0-flash`
 - Word 파싱: `mammoth`
 - Vercel Serverless Functions (`maxDuration: 60s`)

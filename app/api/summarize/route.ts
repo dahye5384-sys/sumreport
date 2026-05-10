@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "gemini-2.0-flash";
 
 const SYSTEM_PROMPT = `당신은 한국어 회의록 요약 전문가입니다.
 입력된 회의록을 한국어로 간결하고 명확하게 요약하세요.
@@ -59,29 +59,25 @@ export async function POST(req: Request) {
     );
   }
 
-  // Per-request OpenAI client — key is never persisted.
-  const client = new OpenAI({ apiKey, timeout: 55_000 });
-
+  // Per-request Gemini client. Key is never persisted server-side.
   let summary = "";
   try {
-    const completion = await client.chat.completions.create({
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
       model: MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: meeting },
-      ],
-      temperature: 0.3,
+      systemInstruction: SYSTEM_PROMPT,
     });
-    summary = completion.choices[0]?.message?.content?.trim() ?? "";
+    const result = await model.generateContent(meeting);
+    summary = result.response.text().trim();
     if (!summary) {
       return NextResponse.json(
-        { error: "GPT 응답이 비어있습니다. 회의록을 다시 확인해주세요." },
+        { error: "Gemini 응답이 비어있습니다. 회의록을 다시 확인해주세요." },
         { status: 502 },
       );
     }
   } catch (err: unknown) {
     return NextResponse.json(
-      { error: formatOpenAIError(err) },
+      { error: formatGeminiError(err) },
       { status: 502 },
     );
   }
@@ -116,14 +112,20 @@ export async function POST(req: Request) {
   });
 }
 
-function formatOpenAIError(err: unknown): string {
-  if (err instanceof OpenAI.APIError) {
-    if (err.status === 401) return "API 키가 잘못되었거나 권한이 없습니다.";
-    if (err.status === 429)
-      return "요청 한도를 초과했거나 결제가 필요합니다 (429).";
-    if (err.status === 408) return "요청이 시간 초과되었습니다.";
-    return `OpenAI 오류 (${err.status ?? "unknown"}): ${err.message}`;
+function formatGeminiError(err: unknown): string {
+  if (err instanceof Error) {
+    const msg = err.message;
+    if (/api[_-]?key.*not.*valid|invalid.*api[_-]?key|api key.*invalid/i.test(msg))
+      return "Gemini API 키가 잘못되었습니다. https://aistudio.google.com/app/apikey 에서 키를 다시 발급받아 주세요.";
+    if (/permission_denied|forbidden|403/i.test(msg))
+      return "API 키에 권한이 없거나 Google AI Studio 사용 약관에 동의하지 않은 상태입니다.";
+    if (/quota|rate.*limit|429/i.test(msg))
+      return "Gemini 요청 한도를 초과했습니다. 1분 후 다시 시도하거나 다른 API 키를 사용해주세요.";
+    if (/safety|blocked/i.test(msg))
+      return "안전 필터에 의해 응답이 차단되었습니다. 회의록 내용을 확인해주세요.";
+    if (/timeout|deadline/i.test(msg))
+      return "요청이 시간 초과되었습니다. 회의록을 짧게 나누어 시도해주세요.";
+    return `Gemini 호출 오류: ${msg}`;
   }
-  if (err instanceof Error) return `처리 중 오류: ${err.message}`;
   return "알 수 없는 오류가 발생했습니다.";
 }
