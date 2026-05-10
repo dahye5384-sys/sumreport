@@ -27,5 +27,17 @@ def summarize_text(meeting_text: str, api_key: str) -> str:
     return response.choices[0].message.content
 
 
+def write_docx(summary: str) -> Path:
+    """Write summary to output/summary-{YYYYMMDD-HHMMSS}.docx. Returns the path."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = OUTPUT_DIR / f"summary-{timestamp}.docx"
+    doc = Document()
+    doc.add_heading("회의 요약", level=1)
+    doc.add_paragraph(summary)
+    doc.save(path)
+    return path
+
+
 if __name__ == "__main__":
-    print("Phase 1 app.py — Task 2 placeholder. main() will be added in Task 4.")
+    print("Phase 1 app.py — Task 3 placeholder. main() will be added in Task 4.")
